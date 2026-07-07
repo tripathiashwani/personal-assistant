@@ -1,5 +1,6 @@
 # AI Personal Knowledge Manager — Backend
 
+## Step 4 status: `documents` model, file upload/list/get/delete (PDF & Markdown only).
 ## Step 2 status: `users` model, JWT auth (register/login/me).
 ## Step 1 status: App skeleton, config, DB session, Alembic wiring, health check.
 
@@ -93,6 +94,46 @@ Newer bcrypt (4.1+) breaks `passlib==1.7.4` due to a removed version
 attribute passlib depends on — don't upgrade bcrypt alone without also
 upgrading passlib, or password hashing will fail with a cryptic
 `AttributeError: module 'bcrypt' has no attribute '__about__'`.
+
+## Document endpoints (Step 4)
+
+Only `.pdf` and `.md`/`.markdown` files are accepted, up to 20MB. All
+routes require the `Authorization: Bearer <token>` header from login.
+
+```bash
+TOKEN="<paste-your-token-here>"
+
+# Upload
+curl -X POST http://localhost:8000/api/v1/documents \
+  -H "Authorization: Bearer $TOKEN" \
+  -F "file=@/path/to/Notes.pdf"
+
+# List your documents
+curl http://localhost:8000/api/v1/documents \
+  -H "Authorization: Bearer $TOKEN"
+
+# Get one document's metadata
+curl http://localhost:8000/api/v1/documents/<document_id> \
+  -H "Authorization: Bearer $TOKEN"
+
+# Delete a document (removes both the file and the DB row)
+curl -X DELETE http://localhost:8000/api/v1/documents/<document_id> \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Ownership:** every document belongs to the user who uploaded it. Trying
+to read or delete someone else's document returns `404` (not `403`) —
+this is deliberate, so a user can't even confirm a given document id
+exists if it isn't theirs.
+
+**Where files land:** `storage/{user_id}/{document_id}.{ext}` — the
+filename on disk is never the original filename, to avoid any path or
+collision issues. The original filename is preserved in the database
+and returned in API responses.
+
+**Status field:** every document starts as `"uploaded"`. It'll transition
+to `"processing"` → `"ready"`/`"failed"` once Step 5 (text extraction)
+and Step 6 (embeddings) are wired in — no schema change needed for that.
 
 ## Project layout
 

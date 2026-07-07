@@ -15,6 +15,10 @@ from app.database.base import Base, import_all_models
 import_all_models()
 
 config = context.config
+# configparser (which alembic.ini uses under the hood) treats '%' as an
+# interpolation character. A URL-encoded password (e.g. "%40" for "@")
+# would otherwise raise "invalid interpolation syntax". Escaping '%' as
+# '%%' here makes configparser store/read it literally.
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL.replace("%", "%%"))
 
 if config.config_file_name is not None:
