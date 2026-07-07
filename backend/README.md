@@ -1,5 +1,6 @@
 # AI Personal Knowledge Manager — Backend
 
+## Step 2 status: `users` model, JWT auth (register/login/me).
 ## Step 1 status: App skeleton, config, DB session, Alembic wiring, health check.
 
 ## Prerequisites
@@ -51,25 +52,47 @@ Interactive docs: `http://localhost:8000/docs`
 
 ## Alembic (migrations)
 
-No models exist yet in Step 1, so there's nothing to migrate. Once we add
-the `users` model in Step 2, migrations will be run like this:
+The `users` table migration is already generated and included in
+`alembic/versions/`. To apply it to your database:
 
 ```bash
-alembic revision --autogenerate -m "create users table"
 alembic upgrade head
 ```
 
-This is verified to work correctly at the end of Step 1 by generating an
-empty migration (see below) — just to confirm Alembic can talk to the DB
-before we start adding real models.
+If you ever change a model later, generate a new migration like this:
 
 ```bash
-alembic revision -m "step1: verify alembic setup"
+alembic revision --autogenerate -m "describe your change"
 alembic upgrade head
 ```
 
-You should see a new file in `alembic/versions/` and Alembic should report
-it applied the migration without errors.
+## Auth endpoints (Step 2)
+
+```bash
+# Register
+curl -X POST http://localhost:8000/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{"email":"you@example.com","password":"yourpassword123"}'
+
+# Login (returns a JWT)
+curl -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"you@example.com","password":"yourpassword123"}'
+
+# Use the token from login to call a protected route
+curl http://localhost:8000/api/v1/auth/me \
+  -H "Authorization: Bearer <paste-token-here>"
+```
+
+You can also test this interactively at `/docs` — click "Authorize",
+paste your token, and try `/auth/me` directly in the Swagger UI.
+
+**Password rule:** minimum 8 characters (enforced by the `UserCreate` schema).
+**Note on bcrypt version:** `requirements.txt` pins `bcrypt==4.0.1` deliberately.
+Newer bcrypt (4.1+) breaks `passlib==1.7.4` due to a removed version
+attribute passlib depends on — don't upgrade bcrypt alone without also
+upgrading passlib, or password hashing will fail with a cryptic
+`AttributeError: module 'bcrypt' has no attribute '__about__'`.
 
 ## Project layout
 

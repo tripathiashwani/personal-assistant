@@ -23,4 +23,4 @@ def import_all_models() -> None:
     line added here, e.g.:
         from app.models import user  # noqa: F401
     """
-    pass
+    from app.models import user  # noqa: F401
