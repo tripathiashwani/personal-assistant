@@ -22,3 +22,4 @@ def import_all_models() -> None:
     """
     from app.models import user  # noqa: F401
     from app.models import document  # noqa: F401
+    from app.models import document_chunk  # noqa: F401

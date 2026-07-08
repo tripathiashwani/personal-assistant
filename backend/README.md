@@ -1,5 +1,6 @@
 # AI Personal Knowledge Manager — Backend
 
+## Step 5 status: text extraction (PDF/Markdown) + chunking, wired into upload as a background task.
 ## Step 4 status: `documents` model, file upload/list/get/delete (PDF & Markdown only).
 ## Step 2 status: `users` model, JWT auth (register/login/me).
 ## Step 1 status: App skeleton, config, DB session, Alembic wiring, health check.
@@ -134,6 +135,43 @@ and returned in API responses.
 **Status field:** every document starts as `"uploaded"`. It'll transition
 to `"processing"` → `"ready"`/`"failed"` once Step 5 (text extraction)
 and Step 6 (embeddings) are wired in — no schema change needed for that.
+
+## Text extraction & chunking (Step 5)
+
+Right after upload, a background task automatically:
+1. Extracts plain text (PDF via `pypdf`, Markdown via a plain read)
+2. Splits it into ~300-word chunks with 50-word overlap
+3. Stores the chunks in `document_chunks`
+4. Flips `document.status`: `uploaded` → `processing` → `ready` (or `failed`)
+
+This runs **after** the upload response is sent, so the upload itself
+feels instant — poll `GET /documents/{id}` or the list endpoint to see
+the status update (it's typically done within a second or two for
+normal-sized files).
+
+```bash
+# See the chunks a document was split into
+curl http://localhost:8000/api/v1/documents/<document_id>/chunks \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+**Why word-count-based chunking instead of a real tokenizer:** token-accurate
+chunking (e.g. via `tiktoken`) would be more precise for feeding an LLM,
+but `tiktoken` downloads its encoding file from the network on first use —
+an unnecessary hidden dependency for something this basic, and it'll
+silently break in any offline/restricted/firewalled environment. Word count
+is a perfectly good proxy for chunk size at this stage. If precise token
+budgeting becomes necessary once we're actually calling embedding models
+in Step 6, that's an easy, isolated swap in `app/rag/chunking.py`.
+
+**When status becomes `failed`:** this happens if a file has no
+extractable text — most commonly an image-only/scanned PDF (no OCR yet)
+or a corrupted file. Check the server logs for the specific error;
+`ingestion_service.py` logs a full traceback for every failure.
+
+**Reprocessing is safe:** if `process_document` ever runs twice for the
+same document, it deletes old chunks before creating new ones — no
+duplicate chunks pile up.
 
 ## Project layout
 
