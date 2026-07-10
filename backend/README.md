@@ -1,5 +1,6 @@
 # AI Personal Knowledge Manager — Backend
 
+## Step 6 status: embeddings (OpenAI) + retriever (cosine similarity, no pgvector yet).
 ## Step 5 status: text extraction (PDF/Markdown) + chunking, wired into upload as a background task.
 ## Step 4 status: `documents` model, file upload/list/get/delete (PDF & Markdown only).
 ## Step 2 status: `users` model, JWT auth (register/login/me).
@@ -172,6 +173,41 @@ or a corrupted file. Check the server logs for the specific error;
 **Reprocessing is safe:** if `process_document` ever runs twice for the
 same document, it deletes old chunks before creating new ones — no
 duplicate chunks pile up.
+
+## Embeddings & retrieval (Step 6)
+
+**You need an OpenAI API key for this step to actually work.** Set it in `.env`:
+
+```dotenv
+OPENAI_API_KEY=sk-...your-key-here...
+```
+
+Once set, every chunk created during ingestion is automatically embedded
+(model: `text-embedding-3-small`, 1536 dimensions) and the vector is
+stored in `document_chunks.embedding` (as JSONB — see the note on
+pgvector below).
+
+**Without a key**, any document you upload will go `uploaded` →
+`processing` → **`failed`** — check the server logs for
+`OPENAI_API_KEY is not configured` to confirm that's why. This is
+expected until you add a key; it's not a bug.
+
+**There's no public API endpoint for search yet** — that's intentional.
+Step 6 only builds the retrieval *capability* (`app/rag/retriever.py`'s
+`get_relevant_chunks(db, user_id, query)`); it gets wired into an actual
+`/chats/.../messages` endpoint in Step 8, once chat models exist. If you
+want to sanity-check retrieval yourself right now, the quickest way is a
+short Python script that calls `get_relevant_chunks` directly against
+your DB after uploading a couple of real documents with a real API key.
+
+**Why JSONB instead of a real vector column:** this MVP does retrieval
+with a plain Python cosine-similarity scan over each user's chunks —
+correct, but O(n) per query. That's genuinely fine at MVP scale (a
+personal knowledge base with dozens to low hundreds of chunks). The
+`embedding` column is designed be swapped for a real `pgvector` column
++ ANN index later without changing anything above
+`document_chunk_repository.py` — the retriever's contract ("query in,
+ranked chunks out") won't change.
 
 ## Project layout
 

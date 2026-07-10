@@ -1,5 +1,5 @@
 """
-Document ingestion pipeline: extract text -> chunk -> store -> update status.
+Document ingestion pipeline: extract text -> chunk -> embed -> store -> update status.
 
 Written as a single plain async function (not a class, not tied to
 FastAPI's BackgroundTasks) specifically so it can be handed to Celery
@@ -16,6 +16,7 @@ import uuid
 
 from app.database.session import AsyncSessionLocal
 from app.models.document import DocumentStatus
+from app.rag import embeddings
 from app.rag.chunking import chunk_text
 from app.rag.loaders import load_document_text
 from app.repositories.document_chunk_repository import DocumentChunkRepository
@@ -49,15 +50,20 @@ async def process_document(document_id: uuid.UUID) -> None:
             if not chunks:
                 raise ValueError("Chunking produced no chunks from the extracted text.")
 
+            # Embed before touching the DB -- if this fails (missing API
+            # key, network error, quota), we want zero chunk rows written
+            # rather than chunks with null embeddings sitting around.
+            chunk_embeddings = await embeddings.get_embeddings_batch(chunks)
+
             # Idempotent: if this document is ever reprocessed, clear old
             # chunks first rather than appending duplicates.
             await chunks_repo.delete_by_document(document.id)
-            await chunks_repo.create_many(document.id, chunks)
+            await chunks_repo.create_many(document.id, chunks, embeddings=chunk_embeddings)
 
             document.status = DocumentStatus.READY.value
             await db.commit()
             logger.info(
-                "process_document: document %s ready with %d chunks",
+                "process_document: document %s ready with %d embedded chunks",
                 document_id,
                 len(chunks),
             )

@@ -1,3 +1,4 @@
+import os
 import uuid
 
 from fastapi import APIRouter, BackgroundTasks, Depends, UploadFile
@@ -19,6 +20,9 @@ from app.services.ingestion_service import process_document
 router = APIRouter(prefix="/documents", tags=["documents"])
 
 
+
+
+
 @router.post("", response_model=DocumentRead, status_code=201)
 async def upload_document(
     background_tasks: BackgroundTasks,
@@ -26,6 +30,7 @@ async def upload_document(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> Document:
+    
     document = await DocumentService(db).upload(current_user.id, file)
     # Ingestion (extract -> chunk -> store) runs after the response is
     # sent, so upload feels instant. The client polls GET /documents or

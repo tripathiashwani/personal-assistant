@@ -38,6 +38,9 @@ class Settings(BaseSettings):
     # --- OpenAI (used from Step 6/8 onward) ---
     OPENAI_API_KEY: str = ""
 
+    # --- Gemini ---
+    GEMINI_API_KEY: str = ""
+
     # --- Storage (used from Step 4 onward) ---
     STORAGE_DIR: str = "./storage"
 
